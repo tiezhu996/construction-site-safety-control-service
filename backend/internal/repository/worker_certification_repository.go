@@ -77,6 +77,14 @@ func (r *WorkerCertificationRepository) Update(c *model.WorkerCertification) err
 	return nil
 }
 
+// UpdateReview persists a review decision made against the expected current state.
+func (r *WorkerCertificationRepository) UpdateReview(c *model.WorkerCertification, expectedStatus string) error {
+	if err := r.db.Save(c).Error; err != nil {
+		return fmt.Errorf("update worker certification review: %w", err)
+	}
+	return nil
+}
+
 // ExpiringSoon 即将过期资质。
 func (r *WorkerCertificationRepository) ExpiringSoon() ([]model.WorkerCertification, error) {
 	var list []model.WorkerCertification

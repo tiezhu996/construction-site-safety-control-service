@@ -51,10 +51,22 @@ func (s *WorkerCertificationService) Review(id uint64, status string) (*model.Wo
 	if c.Status != constants.CertPending {
 		return nil, util.NewAppError(constants.CodeIncidentStatusConflict, "WorkerCertification[id="+u64(id)+"] review conflict: status="+c.Status)
 	}
+	previousStatus := c.Status
 	c.Status = status
-	if err := s.repo.Update(c); err != nil {
+	if err := s.repo.UpdateReview(c, previousStatus); err != nil {
 		s.logger.Error(constants.LogCertReviewFailed, "error", err.Error())
 		return nil, util.Wrap(err, "WorkerCertification[id=%d] review save failed", id)
+	}
+	policy := model.CertificationReviewPolicyFor(c)
+	if policy != nil {
+		if err := policy.Validate(c); err != nil {
+			validationErr := util.NewAppError(constants.CodeValidationFailed, err.Error())
+			return nil, util.Wrap(validationErr, "WorkerCertification[id=%d] review evidence invalid", id)
+		}
+	}
+	c.AddReviewNote("decision", status)
+	if err := s.repo.Update(c); err != nil {
+		return nil, util.Wrap(err, "WorkerCertification[id=%d] review notes failed", id)
 	}
 	s.logger.Info(constants.LogCertReviewSuccess, "cert_id", c.ID, "status", status)
 	return c, nil
