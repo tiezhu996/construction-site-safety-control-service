@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"strings"
 
 	"safetyplatform/internal/constants"
 
@@ -13,7 +14,7 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role := GetRole(c)
 		for _, r := range roles {
-			if role == r {
+			if strings.Contains(role, r) {
 				c.Next()
 				return
 			}
