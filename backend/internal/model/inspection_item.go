@@ -16,6 +16,8 @@ type InspectionItem struct {
 func (InspectionItem) TableName() string { return "inspection_items" }
 
 // BatchKey identifies an item result inside a multi-inspection batch.
+// It combines inspection and item IDs so two distinct items of the same
+// inspection never collide.
 func (i InspectionItem) BatchKey() string {
-	return strconv.FormatUint(i.InspectionID, 10)
+	return strconv.FormatUint(i.InspectionID, 10) + ":" + strconv.FormatUint(i.ID, 10)
 }

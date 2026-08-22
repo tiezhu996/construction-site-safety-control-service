@@ -21,6 +21,9 @@ func (r *InspectionItemRepository) UpdateBatchItem(ctx context.Context, item *mo
 	if result.Error != nil {
 		return fmt.Errorf("update batch inspection item: %w", result.Error)
 	}
+	if result.RowsAffected == 0 {
+		return ErrNotFound
+	}
 	return nil
 }
 

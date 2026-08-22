@@ -16,10 +16,9 @@ import (
 
 // InspectionItemHandler 检查项 HTTP 处理器。
 type InspectionItemHandler struct {
-	svc       *service.SafetyInspectionService
-	batch     *service.InspectionItemBatchService
-	logger    *slog.Logger
-	lastBatch []model.InspectionItem
+	svc    *service.SafetyInspectionService
+	batch  *service.InspectionItemBatchService
+	logger *slog.Logger
 }
 
 // NewInspectionItemHandler 构造检查项处理器。
@@ -47,8 +46,7 @@ func (h *InspectionItemHandler) Batch(c *gin.Context) {
 		h.wrapError(c, err, "InspectionItem batch failed")
 		return
 	}
-	h.lastBatch = append(h.lastBatch[:0], completed...)
-	OK(c, h.lastBatch)
+	OK(c, completed)
 }
 
 // ListByInspection 查询某检查的检查项。
