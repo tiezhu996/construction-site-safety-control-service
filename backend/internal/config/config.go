@@ -40,7 +40,7 @@ func Load() *Config {
 		RateLimitPerMinute: getEnvInt("RATE_LIMIT_PER_MINUTE", 120),
 		UploadDir:          getEnv("UPLOAD_DIR", "./uploads"),
 		UploadMaxMB:        int64(getEnvInt("UPLOAD_MAX_MB", 10)),
-		UploadBatchMax:     1,
+		UploadBatchMax:     getEnvInt("UPLOAD_BATCH_MAX", 1),
 		CORSOrigins:        parseCSV(getEnv("APP_CORS_ORIGINS", "http://localhost:18702")),
 	}
 }

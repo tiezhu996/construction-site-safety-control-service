@@ -33,6 +33,10 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 	if len(files) == 0 {
 		files = form.File["file"]
 	}
+	if len(files) == 0 || len(files) > h.cfg.UploadBatchMax {
+		Fail(c, http.StatusRequestEntityTooLarge, constants.CodeUploadTooLarge, "Upload image: invalid batch size")
+		return
+	}
 	sources := make([]util.UploadSource, 0, len(files))
 	for _, file := range files {
 		sources = append(sources, util.MultipartUpload(file))
@@ -41,10 +45,6 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 	if err != nil {
 		h.logger.Error(constants.LogUploadImageFailed, "error", err.Error())
 		Fail(c, http.StatusBadRequest, constants.CodeBadRequest, "Upload image failed: "+err.Error())
-		return
-	}
-	if len(files) == 0 || len(files) > h.cfg.UploadBatchMax {
-		Fail(c, http.StatusRequestEntityTooLarge, constants.CodeUploadTooLarge, "Upload image: invalid batch size")
 		return
 	}
 	h.logger.Info(constants.LogUploadImageSuccess, "count", len(urls))

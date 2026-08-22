@@ -41,35 +41,53 @@ func SaveUploadedImage(uploadDir string, maxMB int64, file *multipart.FileHeader
 	return urls[0], nil
 }
 
-// SaveUploadedImages 保存一批图片。
+// SaveUploadedImages 保存一批图片。任意一张失败时回滚整批已落盘的文件，
+// 保证目录不会残留半成品；每张图片的句柄在写入完成后立即关闭，避免句柄堆积。
 func SaveUploadedImages(uploadDir string, maxMB int64, files []UploadSource) (urls []string, err error) {
 	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create upload dir: %w", err)
 	}
 	urls = make([]string, 0, len(files))
+	written := make([]string, 0, len(files)) // 本批已落盘的文件名，失败时用于回滚
+	rollback := func() {
+		for _, name := range written {
+			os.Remove(filepath.Join(uploadDir, name))
+		}
+	}
 	for _, file := range files {
 		ext := strings.ToLower(filepath.Ext(file.Name()))
 		if !allowedImageExts[ext] {
+			rollback()
 			return nil, fmt.Errorf("unsupported file type: %s", ext)
 		}
 		if file.SizeBytes() > maxMB*1024*1024 {
+			rollback()
 			return nil, fmt.Errorf("file too large: %d bytes", file.SizeBytes())
 		}
-		var src io.ReadCloser
-		src, err = file.Open()
-		if err != nil {
-			return nil, fmt.Errorf("open upload file: %w", err)
+		src, openErr := file.Open()
+		if openErr != nil {
+			rollback()
+			return nil, fmt.Errorf("open upload file: %w", openErr)
 		}
-		defer func() { err = src.Close() }()
 		name := fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
-		var out *os.File
-		out, err = os.Create(filepath.Join(uploadDir, name))
-		if err != nil {
-			return nil, fmt.Errorf("create destination file: %w", err)
+		out, createErr := os.Create(filepath.Join(uploadDir, name))
+		if createErr != nil {
+			src.Close()
+			rollback()
+			return nil, fmt.Errorf("create destination file: %w", createErr)
 		}
-		defer func() { err = out.Close() }()
-		if _, err = io.Copy(out, src); err != nil {
-			return nil, fmt.Errorf("write upload file: %w", err)
+		written = append(written, name) // 先登记，写入失败时由 rollback 一并清理
+		_, copyErr := io.Copy(out, src)
+		src.Close()
+		closeErr := out.Close()
+		if copyErr != nil {
+			// 写入错误为主错误，丢弃 close 错误以免覆盖。
+			rollback()
+			return nil, fmt.Errorf("write upload file: %w", copyErr)
+		}
+		if closeErr != nil {
+			rollback()
+			return nil, fmt.Errorf("close destination file: %w", closeErr)
 		}
 		urls = append(urls, "/uploads/"+name)
 	}
