@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -58,7 +59,7 @@ func (h *SafetyIncidentHandler) Get(c *gin.Context) {
 		Fail(c, http.StatusBadRequest, constants.CodeBadRequest, "SafetyIncident[id] get: invalid id")
 		return
 	}
-	inc, err := h.svc.Get(id)
+	inc, err := h.svc.GetContext(requestContext(c), id)
 	if err != nil {
 		h.wrapError(c, err, "SafetyIncident get failed")
 		return
@@ -109,12 +110,16 @@ func (h *SafetyIncidentHandler) Rectify(c *gin.Context) {
 		Fail(c, http.StatusBadRequest, constants.CodeBadRequest, "SafetyIncident[id="+strconv.FormatUint(id, 10)+"] rectify: "+err.Error())
 		return
 	}
-	inc, err := h.svc.SubmitRectification(id, req.Measures, req.Deadline)
+	inc, err := h.svc.SubmitRectificationContext(requestContext(c), id, req.Measures, req.Deadline)
 	if err != nil {
 		h.wrapError(c, err, "SafetyIncident rectify failed")
 		return
 	}
 	OK(c, inc)
+}
+
+func requestContext(c *gin.Context) context.Context {
+	return context.Background()
 }
 
 // Close 关闭事件。

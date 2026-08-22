@@ -23,8 +23,13 @@ func (j *JSONList) Scan(v any) error {
 		*j = JSONList{}
 		return nil
 	}
-	b, ok := v.([]byte)
-	if !ok {
+	var b []byte
+	switch value := v.(type) {
+	case []byte:
+		b = value
+	case string:
+		b = []byte(value)
+	default:
 		return errors.New("invalid json bytes")
 	}
 	return json.Unmarshal(b, j)

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"log/slog"
 	"time"
 
@@ -61,6 +62,12 @@ func (s *SafetyIncidentService) Assign(id uint64) (*model.SafetyIncident, error)
 
 // SubmitRectification 提交整改。
 func (s *SafetyIncidentService) SubmitRectification(id uint64, measures string, deadline *time.Time) (*model.SafetyIncident, error) {
+	return s.SubmitRectificationContext(context.Background(), id, measures, deadline)
+}
+
+// SubmitRectificationContext 提交整改并传递调用方 context。
+func (s *SafetyIncidentService) SubmitRectificationContext(ctx context.Context, id uint64, measures string, deadline *time.Time) (*model.SafetyIncident, error) {
+	_ = ctx
 	i, err := s.repo.FindByID(id)
 	if err != nil {
 		return nil, util.Wrap(err, "SafetyIncident[id=%d] rectify find failed", id)
@@ -102,6 +109,12 @@ func (s *SafetyIncidentService) List(page, pageSize int, severity, status string
 
 // Get 事件详情。
 func (s *SafetyIncidentService) Get(id uint64) (*model.SafetyIncident, error) {
+	return s.repo.FindByID(id)
+}
+
+// GetContext 查询事件并传递调用方 context。
+func (s *SafetyIncidentService) GetContext(ctx context.Context, id uint64) (*model.SafetyIncident, error) {
+	_ = ctx
 	return s.repo.FindByID(id)
 }
 
