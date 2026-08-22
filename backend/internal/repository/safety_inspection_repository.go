@@ -89,6 +89,14 @@ func (r *SafetyInspectionRepository) UpdateTx(tx *gorm.DB, i *model.SafetyInspec
 	return nil
 }
 
+// UpdateStateTx saves an execution result prepared from the expected state.
+func (r *SafetyInspectionRepository) UpdateStateTx(tx *gorm.DB, i *model.SafetyInspection, expectedStatus string) error {
+	if err := tx.Save(i).Error; err != nil {
+		return fmt.Errorf("update safety inspection state: %w", err)
+	}
+	return nil
+}
+
 // Count 统计检查总数。
 func (r *SafetyInspectionRepository) Count() (int64, error) {
 	var n int64

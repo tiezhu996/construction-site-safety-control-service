@@ -112,12 +112,16 @@ func (s *SafetyInspectionService) Execute(id uint64, items []model.InspectionIte
 		cur.PassedCount = passed
 		cur.IssueCount = issues
 		cur.TotalScore = score
+		previousStatus := cur.Status
 		if issues == 0 {
 			cur.Status = constants.InspectionCompleted
 		} else {
 			cur.Status = constants.InspectionFailed
 		}
-		if err := s.repo.UpdateTx(tx, cur); err != nil {
+		if !model.CanInspectionTransition(previousStatus, cur.Status) {
+			return util.NewAppError(constants.CodeIncidentStatusConflict, "SafetyInspection[id="+u64(id)+"] execute invalid transition="+previousStatus+"->"+cur.Status)
+		}
+		if err := s.repo.UpdateStateTx(tx, cur, previousStatus); err != nil {
 			s.logger.Error(constants.LogInspectionExecuteFailed, "error", err.Error())
 			return util.Wrap(err, "SafetyInspection[id=%d] execute save failed", id)
 		}

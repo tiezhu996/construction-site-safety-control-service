@@ -2,6 +2,13 @@ package model
 
 import "time"
 
+const (
+	InspectionStateScheduled  = "scheduled"
+	InspectionStateInProgress = "in_progress"
+	InspectionStateCompleted  = "completed"
+	InspectionStateFailed     = "failed"
+)
+
 // SafetyInspection 安全检查实体。
 type SafetyInspection struct {
 	ID             uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
@@ -19,3 +26,22 @@ type SafetyInspection struct {
 
 // TableName 指定表名。
 func (SafetyInspection) TableName() string { return "safety_inspections" }
+
+// CanInspectionTransition reports whether an execution state change is legal.
+func CanInspectionTransition(from, to string) bool {
+	switch from {
+	case InspectionStateScheduled:
+		return to == InspectionStateInProgress || to == InspectionStateCompleted || to == InspectionStateFailed
+	case InspectionStateInProgress:
+		return to == InspectionStateInProgress
+	case InspectionStateCompleted, InspectionStateFailed:
+		return to == InspectionStateInProgress
+	default:
+		return false
+	}
+}
+
+// InspectionReportVisible reports whether a report may be presented.
+func InspectionReportVisible(status string) bool {
+	return status == InspectionStateFailed
+}

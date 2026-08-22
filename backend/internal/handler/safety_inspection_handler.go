@@ -109,6 +109,10 @@ func (h *SafetyInspectionHandler) Report(c *gin.Context) {
 		h.wrapError(c, err, "SafetyInspection report failed")
 		return
 	}
+	if !model.InspectionReportVisible(ins.Status) {
+		Fail(c, http.StatusConflict, constants.CodeIncidentStatusConflict, "SafetyInspection report is not available")
+		return
+	}
 	OK(c, gin.H{"inspection": ins, "items": items})
 }
 
