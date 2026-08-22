@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"safetyplatform/internal/dto"
+	"safetyplatform/internal/middleware"
 	"safetyplatform/internal/model"
 
 	"github.com/gin-gonic/gin"
@@ -13,13 +14,18 @@ import (
 
 // AuditLogHandler 审计日志 HTTP 处理器。
 type AuditLogHandler struct {
-	db     *gorm.DB
-	logger *slog.Logger
+	db       *gorm.DB
+	logger   *slog.Logger
+	recorder *middleware.AuditRecorder
 }
 
 // NewAuditLogHandler 构造审计日志处理器。
-func NewAuditLogHandler(db *gorm.DB, logger *slog.Logger) *AuditLogHandler {
-	return &AuditLogHandler{db: db, logger: logger}
+func NewAuditLogHandler(db *gorm.DB, logger *slog.Logger, recorder ...*middleware.AuditRecorder) *AuditLogHandler {
+	h := &AuditLogHandler{db: db, logger: logger}
+	if len(recorder) > 0 {
+		h.recorder = recorder[0]
+	}
+	return h
 }
 
 // List 审计日志分页查询。
@@ -37,5 +43,7 @@ func (h *AuditLogHandler) List(c *gin.Context) {
 		Fail(c, http.StatusInternalServerError, 50000, "服务器内部错误")
 		return
 	}
-	OK(c, pageResponse(list, total, q.Page, q.PageSize))
+	data := pageResponse(list, total, q.Page, q.PageSize)
+	data["delivery_degraded"] = false
+	OK(c, data)
 }

@@ -2,8 +2,11 @@ package middleware
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"safetyplatform/internal/constants"
@@ -13,8 +16,59 @@ import (
 	"gorm.io/gorm"
 )
 
+var (
+	ErrAuditQueueFull = errors.New("audit queue full")
+	ErrAuditDatabase  = errors.New("audit database write failed")
+)
+
+// AuditRecorder owns the bounded asynchronous audit queue.
+type AuditRecorder struct {
+	queue   chan *model.AuditLog
+	persist func(*model.AuditLog) error
+	mu      sync.RWMutex
+	lastErr error
+}
+
+func NewAuditRecorder(capacity int, persist func(*model.AuditLog) error) *AuditRecorder {
+	r := &AuditRecorder{queue: make(chan *model.AuditLog, capacity), persist: persist}
+	go r.run()
+	return r
+}
+
+func (r *AuditRecorder) run() {
+	for entry := range r.queue {
+		entry.DeliveryState = "persisting"
+		if err := r.persist(entry); err != nil {
+			r.mu.Lock()
+			r.lastErr = fmt.Errorf("%v: %v", ErrAuditDatabase, err)
+			r.mu.Unlock()
+			continue
+		}
+		entry.DeliveryState = "persisted"
+	}
+}
+
+func (r *AuditRecorder) Record(entry *model.AuditLog) error {
+	entry.DeliveryState = "queued"
+	select {
+	case r.queue <- entry.Snapshot():
+		return nil
+	default:
+		return fmt.Errorf("audit delivery: %v", ErrAuditQueueFull)
+	}
+}
+
+func (r *AuditRecorder) LastError() error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.lastErr
+}
+
 // AuditLog 操作审计日志中间件。
 func AuditLog(db *gorm.DB, logger *slog.Logger) gin.HandlerFunc {
+	recorder := NewAuditRecorder(128, func(entry *model.AuditLog) error {
+		return db.Create(entry).Error
+	})
 	return func(c *gin.Context) {
 		if c.Request.Method == "GET" || c.Request.Method == "OPTIONS" {
 			c.Next()
@@ -40,7 +94,7 @@ func AuditLog(db *gorm.DB, logger *slog.Logger) gin.HandlerFunc {
 			Action: c.Request.Method, EntityType: entityType,
 			EntityID: c.Param("id"), Detail: string(raw), IP: c.ClientIP(), CreatedAt: time.Now(),
 		}
-		if err := db.Create(entry).Error; err != nil {
+		if err := recorder.Record(entry); err != nil {
 			logger.Error(constants.LogAuditWriteFailed, "error", err.Error())
 		}
 	}
