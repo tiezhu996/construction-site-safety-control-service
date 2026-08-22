@@ -11,4 +11,5 @@ func (r *Router) registerItemRoutes(g *gin.RouterGroup) {
 	items := g.Group("/inspection-items")
 	items.Use(middleware.AuthRequired(r.cfg))
 	items.GET("/by-inspection/:id", r.item.ListByInspection)
+	items.POST("/batch", r.item.Batch)
 }

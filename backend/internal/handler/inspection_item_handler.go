@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"safetyplatform/internal/constants"
+	"safetyplatform/internal/model"
 	"safetyplatform/internal/service"
 	"safetyplatform/internal/util"
 
@@ -15,13 +16,39 @@ import (
 
 // InspectionItemHandler 检查项 HTTP 处理器。
 type InspectionItemHandler struct {
-	svc    *service.SafetyInspectionService
-	logger *slog.Logger
+	svc       *service.SafetyInspectionService
+	batch     *service.InspectionItemBatchService
+	logger    *slog.Logger
+	lastBatch []model.InspectionItem
 }
 
 // NewInspectionItemHandler 构造检查项处理器。
-func NewInspectionItemHandler(svc *service.SafetyInspectionService, logger *slog.Logger) *InspectionItemHandler {
-	return &InspectionItemHandler{svc: svc, logger: logger}
+func NewInspectionItemHandler(svc *service.SafetyInspectionService, logger *slog.Logger, batch ...*service.InspectionItemBatchService) *InspectionItemHandler {
+	h := &InspectionItemHandler{svc: svc, logger: logger}
+	if len(batch) > 0 {
+		h.batch = batch[0]
+	}
+	return h
+}
+
+// Batch updates multiple inspection items concurrently.
+func (h *InspectionItemHandler) Batch(c *gin.Context) {
+	if h.batch == nil {
+		Fail(c, http.StatusInternalServerError, constants.CodeInternalError, constants.MsgInternalError)
+		return
+	}
+	var items []model.InspectionItem
+	if err := c.ShouldBindJSON(&items); err != nil || len(items) == 0 {
+		Fail(c, http.StatusBadRequest, constants.CodeBadRequest, "InspectionItem batch: invalid items")
+		return
+	}
+	completed, err := h.batch.Process(c.Request.Context(), items)
+	if err != nil {
+		h.wrapError(c, err, "InspectionItem batch failed")
+		return
+	}
+	h.lastBatch = append(h.lastBatch[:0], completed...)
+	OK(c, h.lastBatch)
 }
 
 // ListByInspection 查询某检查的检查项。

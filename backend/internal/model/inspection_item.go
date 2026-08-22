@@ -1,5 +1,7 @@
 package model
 
+import "strconv"
+
 // InspectionItem 检查项实体。
 type InspectionItem struct {
 	ID           uint64 `gorm:"primaryKey;autoIncrement" json:"id"`
@@ -12,3 +14,8 @@ type InspectionItem struct {
 
 // TableName 指定表名。
 func (InspectionItem) TableName() string { return "inspection_items" }
+
+// BatchKey identifies an item result inside a multi-inspection batch.
+func (i InspectionItem) BatchKey() string {
+	return strconv.FormatUint(i.InspectionID, 10)
+}

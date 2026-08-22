@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"fmt"
 
 	"safetyplatform/internal/model"
@@ -11,6 +12,16 @@ import (
 // InspectionItemRepository 检查项仓储。
 type InspectionItemRepository struct {
 	db *gorm.DB
+}
+
+// UpdateBatchItem updates one item from the concurrent batch path.
+func (r *InspectionItemRepository) UpdateBatchItem(ctx context.Context, item *model.InspectionItem) error {
+	result := r.db.WithContext(ctx).Model(&model.InspectionItem{}).Where("id = ?", item.ID).
+		Updates(map[string]any{"passed": item.Passed, "remark": item.Remark, "photo_url": item.PhotoURL})
+	if result.Error != nil {
+		return fmt.Errorf("update batch inspection item: %w", result.Error)
+	}
+	return nil
 }
 
 // NewInspectionItemRepository 构造检查项仓储。
