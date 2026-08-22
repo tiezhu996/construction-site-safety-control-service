@@ -1,7 +1,9 @@
 package router
 
 import (
+	"context"
 	"log/slog"
+	"time"
 
 	"safetyplatform/internal/config"
 	"safetyplatform/internal/handler"
@@ -17,6 +19,7 @@ type Router struct {
 	db      *gorm.DB
 	logger  *slog.Logger
 	limiter *middleware.RateLimiter
+	cleanup context.Context
 
 	user       *handler.UserHandler
 	incident   *handler.SafetyIncidentHandler
@@ -37,14 +40,15 @@ func New(cfg *config.Config, db *gorm.DB, logger *slog.Logger,
 	dashboard *handler.DashboardHandler, upload *handler.UploadHandler, auditLog *handler.AuditLogHandler) *Router {
 	return &Router{
 		cfg: cfg, db: db, logger: logger,
-		limiter: middleware.NewRateLimiter(cfg.RateLimitPerMinute),
-		user:    user, incident: incident, inspection: inspection, item: item,
+		limiter: middleware.NewRateLimiter(cfg.RateLimitPerMinute), cleanup: context.Background(),
+		user: user, incident: incident, inspection: inspection, item: item,
 		training: training, cert: cert, dashboard: dashboard, upload: upload, auditLog: auditLog,
 	}
 }
 
 // Setup 装配全部路由并返回引擎。
 func (r *Router) Setup() *gin.Engine {
+	r.startLimiterCleanup()
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
 	engine.Use(gin.Recovery())
@@ -72,6 +76,16 @@ func (r *Router) Setup() *gin.Engine {
 	r.registerUploadRoutes(v1)
 	r.registerAuditLogRoutes(v1)
 	return engine
+}
+
+// SetCleanupContext 设置后台清理器生命周期。
+func (r *Router) SetCleanupContext(ctx context.Context) { r.cleanup = ctx }
+
+// ActiveLimiterCleaners 返回限流清理器数量。
+func (r *Router) ActiveLimiterCleaners() int { return r.limiter.ActiveCleaners() }
+
+func (r *Router) startLimiterCleanup() {
+	r.limiter.StartCleanup(r.cleanup, time.Minute)
 }
 
 // registerAuthRoutes 登录注册（限流）。
