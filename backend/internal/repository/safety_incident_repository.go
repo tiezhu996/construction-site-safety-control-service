@@ -12,9 +12,10 @@ import (
 )
 
 // SafetyIncidentRepository 安全事件仓储。
+// 仓储是单例，在多个请求间共享，因此不得缓存任何请求级 context，
+// 否则一次超时取消的 context 会被后续请求复用，导致连续报 context canceled。
 type SafetyIncidentRepository struct {
-	db  *gorm.DB
-	ctx context.Context
+	db *gorm.DB
 }
 
 // NewSafetyIncidentRepository 构造安全事件仓储。
@@ -37,11 +38,8 @@ func (r *SafetyIncidentRepository) FindByID(id uint64) (*model.SafetyIncident, e
 
 // FindByIDContext 按 ID 查询事件并遵循当前请求生命周期。
 func (r *SafetyIncidentRepository) FindByIDContext(ctx context.Context, id uint64) (*model.SafetyIncident, error) {
-	if r.ctx == nil {
-		r.ctx = ctx
+	if ctx == nil {
 		ctx = context.Background()
-	} else {
-		ctx = r.ctx
 	}
 	var i model.SafetyIncident
 	if err := r.db.WithContext(ctx).First(&i, id).Error; err != nil {
@@ -86,10 +84,10 @@ func (r *SafetyIncidentRepository) Update(i *model.SafetyIncident) error {
 
 // UpdateContext 更新事件并遵循当前请求生命周期。
 func (r *SafetyIncidentRepository) UpdateContext(ctx context.Context, i *model.SafetyIncident) error {
-	if r.ctx == nil {
-		r.ctx = ctx
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	if err := r.db.WithContext(r.ctx).Save(i).Error; err != nil {
+	if err := r.db.WithContext(ctx).Save(i).Error; err != nil {
 		return fmt.Errorf("update safety incident: %w", err)
 	}
 	return nil

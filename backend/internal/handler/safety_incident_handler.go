@@ -119,6 +119,11 @@ func (h *SafetyIncidentHandler) Rectify(c *gin.Context) {
 }
 
 func requestContext(c *gin.Context) context.Context {
+	// 传递当前 HTTP 请求的 context，使请求取消/超时能沿调用链传播到 DB 查询，
+	// 且不会跨请求串用其它请求的 context。
+	if ctx := c.Request.Context(); ctx != nil {
+		return ctx
+	}
 	return context.Background()
 }
 

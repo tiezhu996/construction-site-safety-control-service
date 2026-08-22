@@ -67,8 +67,7 @@ func (s *SafetyIncidentService) SubmitRectification(id uint64, measures string, 
 
 // SubmitRectificationContext 提交整改并传递调用方 context。
 func (s *SafetyIncidentService) SubmitRectificationContext(ctx context.Context, id uint64, measures string, deadline *time.Time) (*model.SafetyIncident, error) {
-	_ = ctx
-	i, err := s.repo.FindByID(id)
+	i, err := s.repo.FindByIDContext(ctx, id)
 	if err != nil {
 		return nil, util.Wrap(err, "SafetyIncident[id=%d] rectify find failed", id)
 	}
@@ -78,7 +77,7 @@ func (s *SafetyIncidentService) SubmitRectificationContext(ctx context.Context, 
 	i.RectificationMeasures = measures
 	i.RectificationDeadline = deadline
 	i.Status = constants.IncidentResolved
-	if err := s.repo.Update(i); err != nil {
+	if err := s.repo.UpdateContext(ctx, i); err != nil {
 		return nil, util.Wrap(err, "SafetyIncident[id=%d] rectify save failed", id)
 	}
 	s.logger.Info(constants.LogIncidentRectifySuccess, "incident_id", i.ID)
@@ -114,8 +113,7 @@ func (s *SafetyIncidentService) Get(id uint64) (*model.SafetyIncident, error) {
 
 // GetContext 查询事件并传递调用方 context。
 func (s *SafetyIncidentService) GetContext(ctx context.Context, id uint64) (*model.SafetyIncident, error) {
-	_ = ctx
-	return s.repo.FindByID(id)
+	return s.repo.FindByIDContext(ctx, id)
 }
 
 // Trend30 近 30 天趋势。
