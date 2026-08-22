@@ -24,15 +24,22 @@ type SafetyTraining struct {
 // TableName 指定表名。
 func (SafetyTraining) TableName() string { return "safety_trainings" }
 
-// Snapshot 返回培训数据。
+// Snapshot 返回培训数据的独立副本，切断与原对象的切片共享。
 func (t *SafetyTraining) Snapshot() *SafetyTraining {
-	copyValue := *t
-	return &copyValue
+	cp := *t
+	// ParticipantIDs 是唯一的引用类型字段，必须深拷贝，否则副本仍与原对象共享底层数组。
+	if t.ParticipantIDs != nil {
+		dup := make(JSONList, len(t.ParticipantIDs))
+		copy(dup, t.ParticipantIDs)
+		cp.ParticipantIDs = dup
+	}
+	return &cp
 }
 
-// FilterParticipantIDs 返回匹配前缀的列表。
+// FilterParticipantIDs 返回匹配前缀的列表，不修改入参切片。
 func FilterParticipantIDs(ids JSONList, prefix string) JSONList {
-	result := ids[:0]
+	// 使用独立底层数组，避免 ids[:0] 复用入参数组导致过滤时改写源数据。
+	result := make(JSONList, 0, len(ids))
 	for _, id := range ids {
 		if len(prefix) == 0 || strings.HasPrefix(id, prefix) {
 			result = append(result, id)

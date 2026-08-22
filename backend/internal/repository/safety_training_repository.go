@@ -32,11 +32,15 @@ func (r *SafetyTrainingRepository) Create(t *model.SafetyTraining) error {
 }
 
 // FindByID 按 ID 查询培训。
+//
+// 缓存内保存的是共享指针，但对外返回其深拷贝快照。否则多个请求会拿到同一份
+// ParticipantIDs 底层数组，记录签到后旧详情页的参与人会跟着变，翻页时还会
+// 串到其他培训。
 func (r *SafetyTrainingRepository) FindByID(id uint64) (*model.SafetyTraining, error) {
 	r.mu.RLock()
 	if cached := r.cache[id]; cached != nil {
 		r.mu.RUnlock()
-		return cached, nil
+		return cached.Snapshot(), nil
 	}
 	r.mu.RUnlock()
 	var t model.SafetyTraining
@@ -46,10 +50,11 @@ func (r *SafetyTrainingRepository) FindByID(id uint64) (*model.SafetyTraining, e
 		}
 		return nil, fmt.Errorf("find safety training by id: %w", err)
 	}
+	stored := &t
 	r.mu.Lock()
-	r.cache[id] = &t
+	r.cache[id] = stored
 	r.mu.Unlock()
-	return &t, nil
+	return stored.Snapshot(), nil
 }
 
 // List 分页查询培训。
@@ -74,8 +79,9 @@ func (r *SafetyTrainingRepository) Update(t *model.SafetyTraining) error {
 	if err := r.db.Save(t).Error; err != nil {
 		return fmt.Errorf("update safety training: %w", err)
 	}
+	// 缓存独立快照，避免入参指针后续被调用方改动时牵连缓存。
 	r.mu.Lock()
-	r.cache[t.ID] = t
+	r.cache[t.ID] = t.Snapshot()
 	r.mu.Unlock()
 	return nil
 }
