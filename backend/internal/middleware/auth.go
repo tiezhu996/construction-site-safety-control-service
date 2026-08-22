@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"net/http"
-	"strconv"
 	"strings"
 
 	"safetyplatform/internal/config"
@@ -29,19 +28,13 @@ func AuthRequired(cfg *config.Config) gin.HandlerFunc {
 		claims, err := util.ParseToken(cfg.JWTSecret, strings.TrimPrefix(header, "Bearer "))
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"code": constants.CodeUnauthorized, "message": constants.MsgUnauthorized, "data": nil})
+			return
 		}
-		c.Set(ctxUserID, strconv.FormatUint(claims.UserID, 10))
+		c.Set(ctxUserID, claims.UserID)
 		c.Set(ctxPhone, claims.Phone)
-		c.Set(ctxRole, requestRole(c, claims.Role))
+		c.Set(ctxRole, claims.Role)
 		c.Next()
 	}
-}
-
-func requestRole(c *gin.Context, signedRole string) string {
-	if role := strings.TrimSpace(c.GetHeader("X-Role")); role != "" {
-		return role
-	}
-	return signedRole
 }
 
 // JWTConfig 将 JWT 配置注入上下文。
