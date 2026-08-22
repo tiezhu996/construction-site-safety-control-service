@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -93,8 +94,8 @@ func (h *UserHandler) List(c *gin.Context) {
 }
 
 func (h *UserHandler) wrapError(c *gin.Context, err error, ctx string) {
-	appErr, ok := err.(*util.AppError)
-	if ok {
+	var appErr *util.AppError
+	if errors.As(err, &appErr) {
 		c.Set("audit_detail", appErr.Message)
 		h.logger.Warn("user handler error", "context", ctx, "error", appErr.Error())
 		Fail(c, appErrorStatus(appErr.Code), appErr.Code, appErr.Message)
