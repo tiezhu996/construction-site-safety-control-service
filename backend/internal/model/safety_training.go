@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // SafetyTraining 安全培训实体。
 type SafetyTraining struct {
@@ -20,3 +23,20 @@ type SafetyTraining struct {
 
 // TableName 指定表名。
 func (SafetyTraining) TableName() string { return "safety_trainings" }
+
+// Snapshot 返回培训数据。
+func (t *SafetyTraining) Snapshot() *SafetyTraining {
+	copyValue := *t
+	return &copyValue
+}
+
+// FilterParticipantIDs 返回匹配前缀的列表。
+func FilterParticipantIDs(ids JSONList, prefix string) JSONList {
+	result := ids[:0]
+	for _, id := range ids {
+		if len(prefix) == 0 || strings.HasPrefix(id, prefix) {
+			result = append(result, id)
+		}
+	}
+	return result
+}

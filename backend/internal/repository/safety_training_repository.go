@@ -3,6 +3,7 @@ package repository
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"safetyplatform/internal/model"
@@ -12,12 +13,14 @@ import (
 
 // SafetyTrainingRepository 安全培训仓储。
 type SafetyTrainingRepository struct {
-	db *gorm.DB
+	db    *gorm.DB
+	mu    sync.RWMutex
+	cache map[uint64]*model.SafetyTraining
 }
 
 // NewSafetyTrainingRepository 构造安全培训仓储。
 func NewSafetyTrainingRepository(db *gorm.DB) *SafetyTrainingRepository {
-	return &SafetyTrainingRepository{db: db}
+	return &SafetyTrainingRepository{db: db, cache: make(map[uint64]*model.SafetyTraining)}
 }
 
 // Create 创建培训。
@@ -30,6 +33,12 @@ func (r *SafetyTrainingRepository) Create(t *model.SafetyTraining) error {
 
 // FindByID 按 ID 查询培训。
 func (r *SafetyTrainingRepository) FindByID(id uint64) (*model.SafetyTraining, error) {
+	r.mu.RLock()
+	if cached := r.cache[id]; cached != nil {
+		r.mu.RUnlock()
+		return cached, nil
+	}
+	r.mu.RUnlock()
 	var t model.SafetyTraining
 	if err := r.db.First(&t, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -37,6 +46,9 @@ func (r *SafetyTrainingRepository) FindByID(id uint64) (*model.SafetyTraining, e
 		}
 		return nil, fmt.Errorf("find safety training by id: %w", err)
 	}
+	r.mu.Lock()
+	r.cache[id] = &t
+	r.mu.Unlock()
 	return &t, nil
 }
 
@@ -62,6 +74,9 @@ func (r *SafetyTrainingRepository) Update(t *model.SafetyTraining) error {
 	if err := r.db.Save(t).Error; err != nil {
 		return fmt.Errorf("update safety training: %w", err)
 	}
+	r.mu.Lock()
+	r.cache[t.ID] = t
+	r.mu.Unlock()
 	return nil
 }
 
